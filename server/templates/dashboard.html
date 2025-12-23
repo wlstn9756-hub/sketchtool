@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - SketchBlog Auto{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="mb-1 opacity-75">Naver Accounts</p>
+                        <h3>{{ stats.total_accounts }}</h3>
+                    </div>
+                    <i class="bi bi-person-badge" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="mb-1 opacity-75">Places</p>
+                        <h3>{{ stats.total_places }}</h3>
+                    </div>
+                    <i class="bi bi-shop" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="mb-1 opacity-75">Active PCs</p>
+                        <h3>{{ stats.active_pcs }}</h3>
+                    </div>
+                    <i class="bi bi-pc-display" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h4 class="text-warning">{{ stats.pending_tasks }}</h4>
+                <p class="text-muted mb-0">Pending Tasks</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h4 class="text-success">{{ stats.completed_tasks }}</h4>
+                <p class="text-muted mb-0">Completed Tasks</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h4 class="text-danger">{{ stats.failed_tasks }}</h4>
+                <p class="text-muted mb-0">Failed Tasks</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-clock-history"></i> Recent Tasks
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Place</th>
+                    <th>Account</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in recent_tasks %}
+                <tr>
+                    <td>#{{ task.id }}</td>
+                    <td>{{ task.place.name if task.place else '-' }}</td>
+                    <td>{{ task.naver_account.naver_id if task.naver_account else '-' }}</td>
+                    <td><span class="badge badge-status badge-{{ task.status }}">{{ task.status }}</span></td>
+                    <td>{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">No tasks yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

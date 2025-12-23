@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Registered PCs - SketchBlog Auto{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Registered PCs</h2>
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    PCs are automatically registered when they connect to the API using the JAR client.
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>PC Name</th>
+                    <th>Hardware Code</th>
+                    <th>Status</th>
+                    <th>Last Seen</th>
+                    <th>Registered</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pc in pcs %}
+                <tr>
+                    <td>{{ pc.id }}</td>
+                    <td><strong>{{ pc.pc_name }}</strong></td>
+                    <td><code>{{ pc.pc_hw_code }}</code></td>
+                    <td>
+                        {% if pc.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ pc.last_seen.strftime('%Y-%m-%d %H:%M') if pc.last_seen else '-' }}</td>
+                    <td>{{ pc.created_at.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">
+                        No PCs registered yet. Run the JAR client to register a PC.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-terminal"></i> How to Connect a PC
+    </div>
+    <div class="card-body">
+        <ol>
+            <li>Download the <code>SketchNBlogAuto.jar</code> file</li>
+            <li>Make sure Java 17+ is installed</li>
+            <li>Run: <code>java -jar SketchNBlogAuto.jar</code></li>
+            <li>Select menu option 1 to verify PC registration</li>
+            <li>The PC will appear in this list automatically</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}

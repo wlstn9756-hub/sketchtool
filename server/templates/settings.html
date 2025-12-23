@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Settings - SketchBlog Auto{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Settings</h2>
+
+<form action="/settings/save" method="post">
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-key"></i> API Keys
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">ChatGPT API Key</label>
+                <input type="password" name="chatgpt_api_key" class="form-control"
+                       value="{{ settings.get('chatgpt_api_key', '') }}"
+                       placeholder="sk-...">
+                <small class="text-muted">Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a></small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Pixabay API Key (Optional)</label>
+                <input type="password" name="pixabay_api_key" class="form-control"
+                       value="{{ settings.get('pixabay_api_key', '') }}"
+                       placeholder="API key for Pixabay image search">
+                <small class="text-muted">Get your API key from <a href="https://pixabay.com/api/docs/" target="_blank">Pixabay API</a></small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-file-text"></i> Default Prompt
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Default GPT Prompt Template</label>
+                <textarea name="default_prompt" class="form-control" rows="10"
+                          placeholder="Enter default prompt for blog post generation...">{{ settings.get('default_prompt', '') }}</textarea>
+                <small class="text-muted">
+                    Available variables: {placeName}, {placeAddress}, {mainKeyword}, {bottomTags}, {forbiddenWords}
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-server"></i> Server Information
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>API Base URL:</strong></p>
+                    <code>http://localhost:8000/</code>
+                    <p class="text-muted mt-2">
+                        Update <code>config/Config.java</code> in the JAR to point to this server.
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>JAR Configuration:</strong></p>
+                    <pre class="bg-light p-2 rounded"><code>API_BASE_URL = "http://localhost:8000/"</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">
+        <i class="bi bi-save"></i> Save Settings
+    </button>
+</form>
+{% endblock %}
