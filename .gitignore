@@ -15,3 +15,4 @@ src/okio/
 src/org/
 src/dev/
 src/module-info.java
+src/javassist/
