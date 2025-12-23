@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}SketchBlog Auto{% endblock %}</title>
+    <title>{% block title %}블로그 자동화{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --sidebar-width: 250px;
+            --sidebar-width: 260px;
         }
         body {
             min-height: 100vh;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
         }
         .sidebar {
             position: fixed;
@@ -25,7 +26,7 @@
         }
         .sidebar .logo {
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             font-weight: bold;
             margin-bottom: 30px;
             padding-bottom: 20px;
@@ -106,26 +107,26 @@
 <body>
     <div class="sidebar">
         <div class="logo">
-            <i class="bi bi-robot"></i> SketchBlog Auto
+            <i class="bi bi-robot"></i> 블로그 자동화 관리
         </div>
         <nav class="nav flex-column">
             <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">
-                <i class="bi bi-speedometer2"></i> Dashboard
+                <i class="bi bi-speedometer2"></i> 대시보드
             </a>
             <a class="nav-link {% if request.url.path == '/accounts' %}active{% endif %}" href="/accounts">
-                <i class="bi bi-person-badge"></i> Naver Accounts
+                <i class="bi bi-person-badge"></i> 네이버 계정 관리
             </a>
             <a class="nav-link {% if request.url.path == '/places' %}active{% endif %}" href="/places">
-                <i class="bi bi-shop"></i> Places
+                <i class="bi bi-shop"></i> 업체 관리
             </a>
             <a class="nav-link {% if request.url.path == '/tasks' %}active{% endif %}" href="/tasks">
-                <i class="bi bi-list-task"></i> Tasks
+                <i class="bi bi-list-task"></i> 작업 관리
             </a>
             <a class="nav-link {% if request.url.path == '/pcs' %}active{% endif %}" href="/pcs">
-                <i class="bi bi-pc-display"></i> Registered PCs
+                <i class="bi bi-pc-display"></i> 등록된 PC
             </a>
             <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}" href="/settings">
-                <i class="bi bi-gear"></i> Settings
+                <i class="bi bi-gear"></i> 설정
             </a>
         </nav>
     </div>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Registered PCs - SketchBlog Auto{% endblock %}
+{% block title %}등록된 PC - 블로그 자동화{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Registered PCs</h2>
+<h2 class="mb-4">등록된 PC</h2>
 
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i>
-    PCs are automatically registered when they connect to the API using the JAR client.
+    PC는 JAR 클라이언트로 API에 접속할 때 자동으로 등록됩니다.
 </div>
 
 <div class="card">
@@ -15,11 +15,11 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>PC Name</th>
-                    <th>Hardware Code</th>
-                    <th>Status</th>
-                    <th>Last Seen</th>
-                    <th>Registered</th>
+                    <th>PC 이름</th>
+                    <th>하드웨어 코드</th>
+                    <th>상태</th>
+                    <th>마지막 접속</th>
+                    <th>등록일</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,9 +30,9 @@
                     <td><code>{{ pc.pc_hw_code }}</code></td>
                     <td>
                         {% if pc.is_active %}
-                        <span class="badge bg-success">Active</span>
+                        <span class="badge bg-success">활성</span>
                         {% else %}
-                        <span class="badge bg-secondary">Inactive</span>
+                        <span class="badge bg-secondary">비활성</span>
                         {% endif %}
                     </td>
                     <td>{{ pc.last_seen.strftime('%Y-%m-%d %H:%M') if pc.last_seen else '-' }}</td>
@@ -41,7 +41,7 @@
                 {% else %}
                 <tr>
                     <td colspan="6" class="text-center text-muted">
-                        No PCs registered yet. Run the JAR client to register a PC.
+                        등록된 PC가 없습니다. JAR 클라이언트를 실행하면 자동으로 등록됩니다.
                     </td>
                 </tr>
                 {% endfor %}
@@ -52,15 +52,15 @@
 
 <div class="card mt-4">
     <div class="card-header">
-        <i class="bi bi-terminal"></i> How to Connect a PC
+        <i class="bi bi-terminal"></i> PC 연결 방법
     </div>
     <div class="card-body">
         <ol>
-            <li>Download the <code>SketchNBlogAuto.jar</code> file</li>
-            <li>Make sure Java 17+ is installed</li>
-            <li>Run: <code>java -jar SketchNBlogAuto.jar</code></li>
-            <li>Select menu option 1 to verify PC registration</li>
-            <li>The PC will appear in this list automatically</li>
+            <li><code>SketchNBlogAuto.jar</code> 파일을 다운로드합니다</li>
+            <li>Java 17 이상이 설치되어 있어야 합니다</li>
+            <li>명령어 실행: <code>java -jar SketchNBlogAuto.jar</code></li>
+            <li>메뉴에서 1번을 선택하여 PC 등록을 확인합니다</li>
+            <li>이 목록에 PC가 자동으로 표시됩니다</li>
         </ol>
     </div>
 </div>

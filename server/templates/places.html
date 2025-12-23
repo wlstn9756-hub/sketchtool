@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Places - SketchBlog Auto{% endblock %}
+{% block title %}업체 관리 - 블로그 자동화{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Places (Businesses)</h2>
+    <h2>업체 관리</h2>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPlaceModal">
-        <i class="bi bi-plus-circle"></i> Add Place
+        <i class="bi bi-plus-circle"></i> 업체 추가
     </button>
 </div>
 
@@ -15,12 +15,12 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Name</th>
-                    <th>Address</th>
-                    <th>Main Keyword</th>
-                    <th>Image Option</th>
-                    <th>Created</th>
-                    <th>Actions</th>
+                    <th>업체명</th>
+                    <th>주소</th>
+                    <th>메인 키워드</th>
+                    <th>이미지 옵션</th>
+                    <th>등록일</th>
+                    <th>관리</th>
                 </tr>
             </thead>
             <tbody>
@@ -31,7 +31,14 @@
                     <td>{{ place.address[:30] }}{% if place.address|length > 30 %}...{% endif %}</td>
                     <td>{{ place.main_keyword }}</td>
                     <td>
-                        <span class="badge bg-info">{{ place.image_option }}</span>
+                        <span class="badge bg-info">
+                            {% if place.image_option == 'none' %}이미지 없음
+                            {% elif place.image_option == 'text_image' %}텍스트+이미지
+                            {% elif place.image_option == 'custom' %}직접 업로드
+                            {% elif place.image_option == 'google_drive' %}구글 드라이브
+                            {% elif place.image_option == 'pixabay' %}픽사베이
+                            {% else %}{{ place.image_option }}{% endif %}
+                        </span>
                     </td>
                     <td>{{ place.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
@@ -39,7 +46,7 @@
                             <i class="bi bi-eye"></i>
                         </button>
                         <form action="/places/delete/{{ place.id }}" method="post" style="display: inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this place?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('이 업체를 삭제하시겠습니까?')">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
@@ -47,7 +54,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">No places registered</td>
+                    <td colspan="7" class="text-center text-muted">등록된 업체가 없습니다</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -55,79 +62,90 @@
     </div>
 </div>
 
-<!-- Add Place Modal -->
+<!-- 업체 추가 모달 -->
 <div class="modal fade" id="addPlaceModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form action="/places/add" method="post">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add New Place</h5>
+                    <h5 class="modal-title">새 업체 등록</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Place Name *</label>
-                            <input type="text" name="name" class="form-control" required placeholder="Business name">
+                            <label class="form-label">업체명 *</label>
+                            <input type="text" name="name" class="form-control" required placeholder="업체 이름">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Category</label>
-                            <input type="text" name="category" class="form-control" placeholder="restaurant, cafe, etc.">
+                            <label class="form-label">카테고리</label>
+                            <select name="category" class="form-select">
+                                <option value="">선택</option>
+                                <option value="restaurant">음식점</option>
+                                <option value="cafe">카페</option>
+                                <option value="hospital">병원</option>
+                                <option value="beauty">미용/뷰티</option>
+                                <option value="fitness">피트니스</option>
+                                <option value="etc">기타</option>
+                            </select>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Address *</label>
-                        <input type="text" name="address" class="form-control" required placeholder="Full address">
+                        <label class="form-label">주소 *</label>
+                        <input type="text" name="address" class="form-control" required placeholder="전체 주소">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Main Keyword *</label>
-                        <input type="text" name="main_keyword" class="form-control" required placeholder="Primary keyword for blog">
+                        <label class="form-label">메인 키워드 *</label>
+                        <input type="text" name="main_keyword" class="form-control" required placeholder="블로그 메인 키워드">
+                        <small class="text-muted">블로그 글의 핵심이 되는 키워드</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Bottom Tags (comma separated)</label>
-                        <input type="text" name="bottom_tags" class="form-control" placeholder="tag1, tag2, tag3">
+                        <label class="form-label">하단 태그 (쉼표로 구분)</label>
+                        <input type="text" name="bottom_tags" class="form-control" placeholder="태그1, 태그2, 태그3">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Forbidden Words (comma separated)</label>
-                        <input type="text" name="forbidden_words" class="form-control" placeholder="word1, word2">
+                        <label class="form-label">금지 단어 (쉼표로 구분)</label>
+                        <input type="text" name="forbidden_words" class="form-control" placeholder="단어1, 단어2">
+                        <small class="text-muted">GPT가 사용하지 말아야 할 단어</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Custom Prompt</label>
-                        <textarea name="prompt" class="form-control" rows="3" placeholder="Custom GPT prompt (optional)"></textarea>
+                        <label class="form-label">커스텀 프롬프트</label>
+                        <textarea name="prompt" class="form-control" rows="3" placeholder="GPT에게 전달할 추가 지시사항 (선택)"></textarea>
                     </div>
 
                     <hr>
-                    <h6>Image Settings</h6>
+                    <h6><i class="bi bi-image"></i> 이미지 설정</h6>
 
                     <div class="mb-3">
-                        <label class="form-label">Image Option</label>
+                        <label class="form-label">이미지 옵션</label>
                         <select name="image_option" class="form-select" id="imageOption" onchange="toggleImageFields()">
-                            <option value="none">No Images</option>
-                            <option value="text_image">Text + Image</option>
-                            <option value="custom">Custom URLs</option>
-                            <option value="google_drive">Google Drive</option>
-                            <option value="pixabay">Pixabay Search</option>
+                            <option value="none">이미지 없음</option>
+                            <option value="text_image">텍스트 + 이미지 (기본)</option>
+                            <option value="custom">직접 이미지 URL 입력</option>
+                            <option value="google_drive">구글 드라이브에서 가져오기</option>
+                            <option value="pixabay">픽사베이 검색</option>
                         </select>
                     </div>
 
                     <div class="mb-3 image-field d-none" id="customUrlsField">
-                        <label class="form-label">Image URLs (one per line or comma separated)</label>
+                        <label class="form-label">이미지 URL (한 줄에 하나씩 또는 쉼표로 구분)</label>
                         <textarea name="image_urls" class="form-control" rows="3" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+                        <small class="text-muted">여러 이미지를 등록하면 2열 그리드로 배치됩니다</small>
                     </div>
 
                     <div class="mb-3 image-field d-none" id="googleDriveField">
-                        <label class="form-label">Google Drive Folder URL</label>
+                        <label class="form-label">구글 드라이브 폴더 URL</label>
                         <input type="text" name="google_drive_url" class="form-control" placeholder="https://drive.google.com/...">
                     </div>
 
                     <div class="mb-3 image-field d-none" id="pixabayField">
-                        <label class="form-label">Pixabay Search Keyword</label>
-                        <input type="text" name="pixabay_keyword" class="form-control" placeholder="food, restaurant, etc.">
+                        <label class="form-label">픽사베이 검색 키워드</label>
+                        <input type="text" name="pixabay_keyword" class="form-control" placeholder="음식, 카페, 인테리어 등">
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Place</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">업체 등록</button>
                 </div>
             </form>
         </div>
@@ -151,7 +169,7 @@ function toggleImageFields() {
 }
 
 function viewPlace(id) {
-    alert('View place details - ID: ' + id);
+    alert('업체 상세 보기 - ID: ' + id);
 }
 </script>
 {% endblock %}

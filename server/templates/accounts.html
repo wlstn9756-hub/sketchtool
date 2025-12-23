@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Naver Accounts - SketchBlog Auto{% endblock %}
+{% block title %}네이버 계정 관리 - 블로그 자동화{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Naver Accounts</h2>
+    <h2>네이버 계정 관리</h2>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-        <i class="bi bi-plus-circle"></i> Add Account
+        <i class="bi bi-plus-circle"></i> 계정 추가
     </button>
 </div>
 
@@ -15,12 +15,12 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Naver ID</th>
-                    <th>Password</th>
-                    <th>Proxy IP</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
+                    <th>네이버 아이디</th>
+                    <th>비밀번호</th>
+                    <th>프록시 IP</th>
+                    <th>상태</th>
+                    <th>등록일</th>
+                    <th>관리</th>
                 </tr>
             </thead>
             <tbody>
@@ -38,13 +38,15 @@
                     <td>{{ account.proxy_ip or '-' }}</td>
                     <td>
                         <span class="badge {% if account.status == 'active' %}bg-success{% elif account.status == 'blocked' %}bg-danger{% else %}bg-warning{% endif %}">
-                            {{ account.status }}
+                            {% if account.status == 'active' %}활성
+                            {% elif account.status == 'blocked' %}차단됨
+                            {% else %}{{ account.status }}{% endif %}
                         </span>
                     </td>
                     <td>{{ account.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
                         <form action="/accounts/delete/{{ account.id }}" method="post" style="display: inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this account?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('이 계정을 삭제하시겠습니까?')">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
@@ -52,7 +54,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">No accounts registered</td>
+                    <td colspan="7" class="text-center text-muted">등록된 계정이 없습니다</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -60,32 +62,33 @@
     </div>
 </div>
 
-<!-- Add Account Modal -->
+<!-- 계정 추가 모달 -->
 <div class="modal fade" id="addAccountModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <form action="/accounts/add" method="post">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Naver Account</h5>
+                    <h5 class="modal-title">네이버 계정 추가</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Naver ID</label>
-                        <input type="text" name="naver_id" class="form-control" required>
+                        <label class="form-label">네이버 아이디 *</label>
+                        <input type="text" name="naver_id" class="form-control" required placeholder="아이디 입력">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="naver_pw" class="form-control" required>
+                        <label class="form-label">비밀번호 *</label>
+                        <input type="password" name="naver_pw" class="form-control" required placeholder="비밀번호 입력">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Proxy IP (Optional)</label>
-                        <input type="text" name="proxy_ip" class="form-control" placeholder="ip:port">
+                        <label class="form-label">프록시 IP (선택)</label>
+                        <input type="text" name="proxy_ip" class="form-control" placeholder="ip:port 형식">
+                        <small class="text-muted">프록시를 사용하려면 IP:PORT 형식으로 입력</small>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Account</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">계정 추가</button>
                 </div>
             </form>
         </div>

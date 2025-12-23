@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Tasks - SketchBlog Auto{% endblock %}
+{% block title %}작업 관리 - 블로그 자동화{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Blog Tasks</h2>
+    <h2>작업 관리</h2>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
-        <i class="bi bi-plus-circle"></i> Create Task
+        <i class="bi bi-plus-circle"></i> 새 작업 생성
     </button>
 </div>
 
@@ -14,7 +14,7 @@
         <div class="card bg-warning text-dark">
             <div class="card-body text-center">
                 <h4>{{ tasks|selectattr('status', 'equalto', 'pending')|list|length }}</h4>
-                <small>Pending</small>
+                <small>대기중</small>
             </div>
         </div>
     </div>
@@ -22,7 +22,7 @@
         <div class="card bg-info text-white">
             <div class="card-body text-center">
                 <h4>{{ tasks|selectattr('status', 'equalto', 'in_progress')|list|length }}</h4>
-                <small>In Progress</small>
+                <small>진행중</small>
             </div>
         </div>
     </div>
@@ -30,7 +30,7 @@
         <div class="card bg-success text-white">
             <div class="card-body text-center">
                 <h4>{{ tasks|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
-                <small>Completed</small>
+                <small>완료</small>
             </div>
         </div>
     </div>
@@ -38,7 +38,7 @@
         <div class="card bg-danger text-white">
             <div class="card-body text-center">
                 <h4>{{ tasks|selectattr('status', 'equalto', 'fail')|list|length }}</h4>
-                <small>Failed</small>
+                <small>실패</small>
             </div>
         </div>
     </div>
@@ -50,12 +50,12 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Place</th>
-                    <th>Account</th>
-                    <th>Status</th>
-                    <th>Result URL</th>
-                    <th>Created</th>
-                    <th>Completed</th>
+                    <th>업체명</th>
+                    <th>계정</th>
+                    <th>상태</th>
+                    <th>발행 URL</th>
+                    <th>생성일</th>
+                    <th>완료일</th>
                 </tr>
             </thead>
             <tbody>
@@ -63,14 +63,20 @@
                 <tr>
                     <td>#{{ task.id }}</td>
                     <td>{{ task.place.name if task.place else '-' }}</td>
-                    <td>{{ task.naver_account.naver_id if task.naver_account else '<span class="text-muted">Auto-assign</span>'|safe }}</td>
+                    <td>{{ task.naver_account.naver_id if task.naver_account else '<span class="text-muted">자동 배정</span>'|safe }}</td>
                     <td>
-                        <span class="badge badge-status badge-{{ task.status }}">{{ task.status }}</span>
+                        <span class="badge badge-status badge-{{ task.status }}">
+                            {% if task.status == 'pending' %}대기중
+                            {% elif task.status == 'in_progress' %}진행중
+                            {% elif task.status == 'completed' %}완료
+                            {% elif task.status == 'fail' %}실패
+                            {% else %}{{ task.status }}{% endif %}
+                        </span>
                     </td>
                     <td>
                         {% if task.result_post_url %}
                         <a href="{{ task.result_post_url }}" target="_blank" class="btn btn-sm btn-outline-success">
-                            <i class="bi bi-link-45deg"></i> View
+                            <i class="bi bi-link-45deg"></i> 보기
                         </a>
                         {% else %}
                         -
@@ -81,7 +87,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">No tasks yet</td>
+                    <td colspan="7" class="text-center text-muted">아직 작업이 없습니다</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -89,44 +95,44 @@
     </div>
 </div>
 
-<!-- Add Task Modal -->
+<!-- 작업 생성 모달 -->
 <div class="modal fade" id="addTaskModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <form action="/tasks/add" method="post">
                 <div class="modal-header">
-                    <h5 class="modal-title">Create New Task</h5>
+                    <h5 class="modal-title">새 작업 생성</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Select Place *</label>
+                        <label class="form-label">업체 선택 *</label>
                         <select name="place_id" class="form-select" required>
-                            <option value="">-- Select Place --</option>
+                            <option value="">-- 업체를 선택하세요 --</option>
                             {% for place in places %}
                             <option value="{{ place.id }}">{{ place.name }} ({{ place.main_keyword }})</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Assign Account (Optional)</label>
+                        <label class="form-label">계정 배정 (선택)</label>
                         <select name="naver_account_id" class="form-select">
-                            <option value="">Auto-assign available account</option>
+                            <option value="">자동 배정 (가능한 계정 사용)</option>
                             {% for account in accounts %}
                             <option value="{{ account.id }}">{{ account.naver_id }}</option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Leave empty to auto-assign when task starts</small>
+                        <small class="text-muted">비워두면 작업 시작 시 자동으로 배정됩니다</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Task Count</label>
+                        <label class="form-label">작업 횟수</label>
                         <input type="number" name="task_count" class="form-control" value="1" min="1" max="10">
-                        <small class="text-muted">Number of blog posts to create</small>
+                        <small class="text-muted">생성할 블로그 글 개수</small>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Task</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">작업 생성</button>
                 </div>
             </form>
         </div>
