@@ -2,3 +2,16 @@ adsketchlab-8fbd8687cedf.json
 
 SketchToolWeb (1).zip
 SketchToolWeb_extracted/
+
+# Decompiled library sources (keep only core sources)
+src/com/
+src/io/
+src/javax/
+src/jersey/
+src/kotlin/
+src/net/
+src/okhttp3/
+src/okio/
+src/org/
+src/dev/
+src/module-info.java
