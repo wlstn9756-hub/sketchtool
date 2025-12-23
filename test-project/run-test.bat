@@ -1,41 +1,40 @@
 @echo off
-chcp 65001 > nul
 echo =========================================
-echo   이미지 효과 테스트 빌드 및 실행
+echo   Image Effect Test - Build and Run
 echo =========================================
 echo.
 
-REM Gradle 확인
+REM Check Gradle
 where gradle >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
-    echo Gradle Wrapper 사용...
+    echo Using Gradle Wrapper...
     set GRADLE_CMD=gradlew.bat
 ) else (
     set GRADLE_CMD=gradle
 )
 
-REM 빌드
-echo 🔨 프로젝트 빌드 중...
+REM Build
+echo [BUILD] Building project...
 call %GRADLE_CMD% build -q
 
 if %ERRORLEVEL% NEQ 0 (
-    echo ❌ 빌드 실패
+    echo [ERROR] Build failed!
     pause
     exit /b 1
 )
 
-echo ✅ 빌드 성공!
+echo [OK] Build successful!
 echo.
 
-REM 실행
-echo 🚀 테스트 실행 중...
+REM Run
+echo [RUN] Running test...
 echo ----------------------------------------
 call %GRADLE_CMD% run --args="%*" -q
 
 echo.
 echo =========================================
-echo 📁 결과 파일: %CD%\output\
+echo [OUTPUT] Result files: %CD%\output\
 echo =========================================
-dir /b output 2>nul || echo (output 폴더가 비어있습니다)
+dir /b output 2>nul || echo (output folder is empty)
 echo.
 pause
