@@ -17,3 +17,6 @@ src/dev/
 src/module-info.java
 src/javassist/
 test-project/.gradle/
+server/__pycache__/
+*.pyc
+*.db
