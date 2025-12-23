@@ -5,7 +5,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime
+from contextlib import asynccontextmanager
 from typing import Optional, List
+import hashlib
 import json
 import os
 
@@ -14,30 +16,25 @@ from database import (
     User, RegisteredPC, NaverAccount, Place, BlogTask, Setting, TaskHistory
 )
 
-app = FastAPI(title="SketchBlog Auto - Admin Panel")
+def hash_password(password: str) -> str:
+    """Simple password hashing using SHA256"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
-# Static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-# Initialize database on startup
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     init_db()
-    # Create default admin user if not exists
     db = next(get_db())
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
-        from passlib.hash import bcrypt
         admin = User(
             username="admin",
-            hashed_password=bcrypt.hash("admin123"),
+            hashed_password=hash_password("admin123"),
             is_admin=True
         )
         db.add(admin)
         db.commit()
 
-    # Create default settings
     default_settings = [
         ("chatgpt_api_key", ""),
         ("pixabay_api_key", ""),
@@ -49,6 +46,14 @@ async def startup():
             db.add(Setting(key=key, value=value))
     db.commit()
     db.close()
+    yield
+    # Shutdown (nothing to do)
+
+app = FastAPI(title="SketchBlog Auto - Admin Panel", lifespan=lifespan)
+
+# Static files and templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # ============================================
 # Admin Web Pages
