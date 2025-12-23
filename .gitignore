@@ -16,3 +16,4 @@ src/org/
 src/dev/
 src/module-info.java
 src/javassist/
+test-project/.gradle/
