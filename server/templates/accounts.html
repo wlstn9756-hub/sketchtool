@@ -18,6 +18,7 @@
                     <th>네이버 아이디</th>
                     <th>비밀번호</th>
                     <th>프록시 IP</th>
+                    <th>일일 제한</th>
                     <th>상태</th>
                     <th>등록일</th>
                     <th>관리</th>
@@ -36,6 +37,7 @@
                         </button>
                     </td>
                     <td>{{ account.proxy_ip or '-' }}</td>
+                    <td>{{ account.daily_limit or 10 }}</td>
                     <td>
                         <span class="badge {% if account.status == 'active' %}bg-success{% elif account.status == 'blocked' %}bg-danger{% else %}bg-warning{% endif %}">
                             {% if account.status == 'active' %}활성
@@ -54,7 +56,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">등록된 계정이 없습니다</td>
+                    <td colspan="8" class="text-center text-muted">등록된 계정이 없습니다</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -84,6 +86,11 @@
                         <label class="form-label">프록시 IP (선택)</label>
                         <input type="text" name="proxy_ip" class="form-control" placeholder="ip:port 형식">
                         <small class="text-muted">프록시를 사용하려면 IP:PORT 형식으로 입력</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">일일 작업 제한</label>
+                        <input type="number" name="daily_limit" class="form-control" value="10" min="1" max="100">
+                        <small class="text-muted">이 계정의 일일 최대 작업 수</small>
                     </div>
                 </div>
                 <div class="modal-footer">

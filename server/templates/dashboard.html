@@ -2,11 +2,11 @@
 {% block title %}대시보드 - 블로그 자동화{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">대시보드</h2>
+<h2 class="page-title mb-4"><i class="bi bi-speedometer2"></i> 대시보드</h2>
 
 <div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="card stat-card">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card purple">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -18,21 +18,34 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="card stat-card info">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card blue">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <p class="mb-1 opacity-75">등록된 업체</p>
-                        <h3>{{ stats.total_places }}</h3>
+                        <p class="mb-1 opacity-75">진행중 배포</p>
+                        <h3>{{ stats.total_distributions }}</h3>
                     </div>
-                    <i class="bi bi-shop" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                    <i class="bi bi-send" style="font-size: 2.5rem; opacity: 0.5;"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
-        <div class="card stat-card success">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card green">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="mb-1 opacity-75">오늘 작업</p>
+                        <h3>{{ stats.today_tasks }}</h3>
+                    </div>
+                    <i class="bi bi-calendar-check" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card orange">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -84,6 +97,7 @@
                     <th>ID</th>
                     <th>업체명</th>
                     <th>계정</th>
+                    <th>예정일</th>
                     <th>상태</th>
                     <th>생성일</th>
                 </tr>
@@ -92,10 +106,11 @@
                 {% for task in recent_tasks %}
                 <tr>
                     <td>#{{ task.id }}</td>
-                    <td>{{ task.place.name if task.place else '-' }}</td>
-                    <td>{{ task.naver_account.naver_id if task.naver_account else '-' }}</td>
+                    <td>{{ task.distribution.place_name if task.distribution else '-' }}</td>
+                    <td>{{ task.naver_account.naver_id if task.naver_account else '<span class="text-muted">미배정</span>'|safe }}</td>
+                    <td>{{ task.scheduled_date.strftime('%Y-%m-%d') if task.scheduled_date else '-' }}</td>
                     <td>
-                        <span class="badge badge-status badge-{{ task.status }}">
+                        <span class="badge badge-{{ task.status }}">
                             {% if task.status == 'pending' %}대기중
                             {% elif task.status == 'in_progress' %}진행중
                             {% elif task.status == 'completed' %}완료
@@ -107,7 +122,10 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="text-center text-muted">아직 작업이 없습니다</td>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p class="mt-2 mb-0">아직 작업이 없습니다</p>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

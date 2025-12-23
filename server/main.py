@@ -3,8 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import datetime
+from sqlalchemy import func, and_
+from datetime import datetime, date, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional, List
 import hashlib
@@ -13,25 +13,20 @@ import os
 
 from database import (
     init_db, get_db,
-    User, RegisteredPC, NaverAccount, Place, BlogTask, Setting, TaskHistory
+    User, RegisteredPC, NaverAccount, BlogDistribution, TaskAssignment, Setting, TaskHistory
 )
+from crawler import PlaceCrawler
 
 def hash_password(password: str) -> str:
-    """Simple password hashing using SHA256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     init_db()
     db = next(get_db())
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
-        admin = User(
-            username="admin",
-            hashed_password=hash_password("admin123"),
-            is_admin=True
-        )
+        admin = User(username="admin", hashed_password=hash_password("admin123"), is_admin=True)
         db.add(admin)
         db.commit()
 
@@ -41,41 +36,41 @@ async def lifespan(app: FastAPI):
         ("default_prompt", ""),
     ]
     for key, value in default_settings:
-        existing = db.query(Setting).filter(Setting.key == key).first()
-        if not existing:
+        if not db.query(Setting).filter(Setting.key == key).first():
             db.add(Setting(key=key, value=value))
     db.commit()
     db.close()
     yield
-    # Shutdown (nothing to do)
 
-app = FastAPI(title="SketchBlog Auto - Admin Panel", lifespan=lifespan)
-
-# Static files and templates
+app = FastAPI(title="블로그 자동화 관리", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # ============================================
-# Admin Web Pages
+# 대시보드
 # ============================================
-
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
+    today = date.today()
     stats = {
         "total_accounts": db.query(NaverAccount).filter(NaverAccount.is_active == True).count(),
-        "total_places": db.query(Place).filter(Place.is_active == True).count(),
-        "pending_tasks": db.query(BlogTask).filter(BlogTask.status == "pending").count(),
-        "completed_tasks": db.query(BlogTask).filter(BlogTask.status == "completed").count(),
-        "failed_tasks": db.query(BlogTask).filter(BlogTask.status == "fail").count(),
+        "total_distributions": db.query(BlogDistribution).filter(BlogDistribution.is_active == True).count(),
+        "pending_tasks": db.query(TaskAssignment).filter(TaskAssignment.status == "pending").count(),
+        "today_tasks": db.query(TaskAssignment).filter(TaskAssignment.scheduled_date == today).count(),
+        "completed_tasks": db.query(TaskAssignment).filter(TaskAssignment.status == "completed").count(),
+        "failed_tasks": db.query(TaskAssignment).filter(TaskAssignment.status == "fail").count(),
         "active_pcs": db.query(RegisteredPC).filter(RegisteredPC.is_active == True).count(),
     }
-    recent_tasks = db.query(BlogTask).order_by(BlogTask.created_at.desc()).limit(10).all()
+    recent_tasks = db.query(TaskAssignment).order_by(TaskAssignment.created_at.desc()).limit(10).all()
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "stats": stats,
         "recent_tasks": recent_tasks
     })
 
+# ============================================
+# 네이버 계정 관리
+# ============================================
 @app.get("/accounts", response_class=HTMLResponse)
 async def accounts_page(request: Request, db: Session = Depends(get_db)):
     accounts = db.query(NaverAccount).order_by(NaverAccount.created_at.desc()).all()
@@ -86,16 +81,15 @@ async def add_account(
     naver_id: str = Form(...),
     naver_pw: str = Form(...),
     proxy_ip: str = Form(None),
+    daily_limit: int = Form(10),
     db: Session = Depends(get_db)
 ):
-    existing = db.query(NaverAccount).filter(NaverAccount.naver_id == naver_id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Account already exists")
-
+    if db.query(NaverAccount).filter(NaverAccount.naver_id == naver_id).first():
+        raise HTTPException(status_code=400, detail="이미 등록된 계정입니다")
     account = NaverAccount(
-        naver_id=naver_id,
-        naver_pw=naver_pw,
-        proxy_ip=proxy_ip if proxy_ip else None
+        naver_id=naver_id, naver_pw=naver_pw,
+        proxy_ip=proxy_ip if proxy_ip else None,
+        daily_limit=daily_limit
     )
     db.add(account)
     db.commit()
@@ -109,85 +103,121 @@ async def delete_account(account_id: int, db: Session = Depends(get_db)):
         db.commit()
     return RedirectResponse(url="/accounts", status_code=303)
 
-@app.get("/places", response_class=HTMLResponse)
-async def places_page(request: Request, db: Session = Depends(get_db)):
-    places = db.query(Place).filter(Place.is_active == True).order_by(Place.created_at.desc()).all()
-    return templates.TemplateResponse("places.html", {"request": request, "places": places})
+# ============================================
+# 블로그 배포 관리
+# ============================================
+@app.get("/distributions", response_class=HTMLResponse)
+async def distributions_page(request: Request, db: Session = Depends(get_db)):
+    distributions = db.query(BlogDistribution).filter(BlogDistribution.is_active == True).order_by(BlogDistribution.created_at.desc()).all()
+    return templates.TemplateResponse("distributions.html", {"request": request, "distributions": distributions})
 
-@app.post("/places/add")
-async def add_place(
-    name: str = Form(...),
-    address: str = Form(...),
-    main_keyword: str = Form(...),
-    category: str = Form(None),
-    bottom_tags: str = Form(None),
-    forbidden_words: str = Form(None),
-    prompt: str = Form(None),
+@app.get("/distributions/new", response_class=HTMLResponse)
+async def new_distribution_page(request: Request, db: Session = Depends(get_db)):
+    accounts = db.query(NaverAccount).filter(NaverAccount.is_active == True).all()
+    return templates.TemplateResponse("distribution_form.html", {"request": request, "accounts": accounts})
+
+@app.post("/api/place/lookup")
+async def lookup_place(url: str = Form(...)):
+    """플레이스 URL 조회"""
+    # URL 유효성 검사
+    validation = PlaceCrawler.validate_url(url)
+    if not validation["valid"]:
+        return JSONResponse({"success": False, "error": validation["error"]})
+
+    # 크롤링
+    result = await PlaceCrawler.fetch_place_info(url)
+    return JSONResponse(result)
+
+@app.post("/distributions/add")
+async def add_distribution(
+    place_url: str = Form(...),
+    place_name: str = Form(...),
+    place_address: str = Form(...),
+    place_category: str = Form(None),
+    distribution_category: str = Form(...),
     image_option: str = Form("none"),
     image_urls: str = Form(None),
     google_drive_url: str = Form(None),
     pixabay_keyword: str = Form(None),
+    start_date: str = Form(...),
+    daily_task_count: int = Form(1),
+    total_days: int = Form(1),
+    main_keyword: str = Form(...),
+    forbidden_words: str = Form(None),
+    bottom_tags: str = Form(None),
+    prompt_template: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    place = Place(
-        name=name,
-        address=address,
-        main_keyword=main_keyword,
-        category=category,
-        bottom_tags=bottom_tags,
-        forbidden_words=forbidden_words,
-        prompt=prompt,
+    # 시작일 파싱
+    start = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end = start + timedelta(days=total_days - 1)
+
+    # 배포 생성
+    distribution = BlogDistribution(
+        place_url=place_url,
+        place_name=place_name,
+        place_address=place_address,
+        place_category=place_category,
+        distribution_category=distribution_category,
         image_option=image_option,
         image_urls=image_urls,
         google_drive_url=google_drive_url,
-        pixabay_keyword=pixabay_keyword
+        pixabay_keyword=pixabay_keyword,
+        start_date=start,
+        daily_task_count=daily_task_count,
+        total_days=total_days,
+        expected_end_date=end,
+        main_keyword=main_keyword,
+        forbidden_words=forbidden_words,
+        bottom_tags=bottom_tags,
+        prompt_template=prompt_template,
+        total_tasks=daily_task_count * total_days
     )
-    db.add(place)
+    db.add(distribution)
     db.commit()
-    return RedirectResponse(url="/places", status_code=303)
 
-@app.post("/places/delete/{place_id}")
-async def delete_place(place_id: int, db: Session = Depends(get_db)):
-    place = db.query(Place).filter(Place.id == place_id).first()
-    if place:
-        place.is_active = False
+    # 개별 작업 생성
+    for day_offset in range(total_days):
+        scheduled = start + timedelta(days=day_offset)
+        for _ in range(daily_task_count):
+            assignment = TaskAssignment(
+                distribution_id=distribution.id,
+                scheduled_date=scheduled,
+                status="pending"
+            )
+            db.add(assignment)
+    db.commit()
+
+    return RedirectResponse(url="/distributions", status_code=303)
+
+@app.post("/distributions/delete/{dist_id}")
+async def delete_distribution(dist_id: int, db: Session = Depends(get_db)):
+    dist = db.query(BlogDistribution).filter(BlogDistribution.id == dist_id).first()
+    if dist:
+        dist.is_active = False
+        dist.status = "cancelled"
         db.commit()
-    return RedirectResponse(url="/places", status_code=303)
+    return RedirectResponse(url="/distributions", status_code=303)
 
+# ============================================
+# 작업 관리
+# ============================================
 @app.get("/tasks", response_class=HTMLResponse)
 async def tasks_page(request: Request, db: Session = Depends(get_db)):
-    tasks = db.query(BlogTask).order_by(BlogTask.created_at.desc()).all()
-    places = db.query(Place).filter(Place.is_active == True).all()
-    accounts = db.query(NaverAccount).filter(NaverAccount.is_active == True).all()
-    return templates.TemplateResponse("tasks.html", {
-        "request": request,
-        "tasks": tasks,
-        "places": places,
-        "accounts": accounts
-    })
+    tasks = db.query(TaskAssignment).order_by(TaskAssignment.scheduled_date.desc(), TaskAssignment.created_at.desc()).limit(100).all()
+    return templates.TemplateResponse("tasks.html", {"request": request, "tasks": tasks})
 
-@app.post("/tasks/add")
-async def add_task(
-    place_id: int = Form(...),
-    naver_account_id: int = Form(None),
-    task_count: int = Form(1),
-    db: Session = Depends(get_db)
-):
-    task = BlogTask(
-        place_id=place_id,
-        naver_account_id=naver_account_id if naver_account_id else None,
-        task_count=task_count,
-        status="pending"
-    )
-    db.add(task)
-    db.commit()
-    return RedirectResponse(url="/tasks", status_code=303)
-
+# ============================================
+# PC 관리
+# ============================================
 @app.get("/pcs", response_class=HTMLResponse)
 async def pcs_page(request: Request, db: Session = Depends(get_db)):
     pcs = db.query(RegisteredPC).order_by(RegisteredPC.created_at.desc()).all()
     return templates.TemplateResponse("pcs.html", {"request": request, "pcs": pcs})
 
+# ============================================
+# 설정
+# ============================================
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, db: Session = Depends(get_db)):
     settings = {s.key: s.value for s in db.query(Setting).all()}
@@ -200,12 +230,7 @@ async def save_settings(
     default_prompt: str = Form(""),
     db: Session = Depends(get_db)
 ):
-    settings_data = {
-        "chatgpt_api_key": chatgpt_api_key,
-        "pixabay_api_key": pixabay_api_key,
-        "default_prompt": default_prompt
-    }
-    for key, value in settings_data.items():
+    for key, value in {"chatgpt_api_key": chatgpt_api_key, "pixabay_api_key": pixabay_api_key, "default_prompt": default_prompt}.items():
         setting = db.query(Setting).filter(Setting.key == key).first()
         if setting:
             setting.value = value
@@ -215,16 +240,12 @@ async def save_settings(
     return RedirectResponse(url="/settings", status_code=303)
 
 # ============================================
-# API Endpoints (for JAR client)
+# JAR 클라이언트 API
 # ============================================
-
 @app.get("/api/blog-task")
-async def get_blog_task(
-    pc_hw_code: str = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Get next pending task for the given PC"""
-    # Register/update PC
+async def get_blog_task(pc_hw_code: str = Query(...), db: Session = Depends(get_db)):
+    """JAR 클라이언트가 다음 작업을 요청"""
+    # PC 등록/업데이트
     pc = db.query(RegisteredPC).filter(RegisteredPC.pc_hw_code == pc_hw_code).first()
     if not pc:
         pc = RegisteredPC(pc_hw_code=pc_hw_code, pc_name=f"PC-{pc_hw_code[:8]}")
@@ -233,56 +254,60 @@ async def get_blog_task(
     pc.is_active = True
     db.commit()
 
-    # Find pending task
-    task = db.query(BlogTask).filter(
-        BlogTask.status == "pending"
-    ).order_by(BlogTask.created_at.asc()).first()
+    # 오늘 날짜의 대기중인 작업 찾기
+    today = date.today()
+    task = db.query(TaskAssignment).filter(
+        TaskAssignment.status == "pending",
+        TaskAssignment.scheduled_date <= today
+    ).order_by(TaskAssignment.scheduled_date.asc()).first()
 
     if not task:
-        return {"success": False, "message": "No pending tasks"}
+        return {"success": False, "message": "할당된 작업이 없습니다"}
 
-    place = task.place
+    distribution = task.distribution
+    if not distribution:
+        return {"success": False, "message": "배포 정보를 찾을 수 없습니다"}
 
-    # Get available account if not assigned
+    # 사용 가능한 계정 찾기
     if not task.naver_account_id:
-        available_account = db.query(NaverAccount).filter(
+        account = db.query(NaverAccount).filter(
             NaverAccount.is_active == True,
             NaverAccount.status == "active"
         ).first()
-        if available_account:
-            task.naver_account_id = available_account.id
+        if account:
+            task.naver_account_id = account.id
             db.commit()
 
     account = task.naver_account
     if not account:
-        return {"success": False, "message": "No available accounts"}
+        return {"success": False, "message": "사용 가능한 계정이 없습니다"}
 
-    # Parse image URLs
+    # 이미지 URL 파싱
     image_urls = []
-    if place.image_urls:
+    if distribution.image_urls:
         try:
-            image_urls = json.loads(place.image_urls)
+            image_urls = json.loads(distribution.image_urls)
         except:
-            image_urls = [url.strip() for url in place.image_urls.split(",") if url.strip()]
+            image_urls = [u.strip() for u in distribution.image_urls.split(",") if u.strip()]
 
     return {
         "success": True,
         "taskId": task.id,
         "assignmentId": task.id,
-        "placeName": place.name,
-        "placeAddress": place.address,
-        "placeOriginAddress": place.origin_address or place.address,
-        "placeUrl": place.url or "",
-        "mainKeyword": place.main_keyword,
-        "bottomTagsString": place.bottom_tags or "",
-        "forbiddenWordsString": place.forbidden_words or "",
-        "taskCount": task.task_count,
-        "prompt": place.prompt or "",
-        "category": place.category or "",
-        "imageOption": place.image_option,
+        "placeName": distribution.place_name,
+        "placeAddress": distribution.place_address,
+        "placeOriginAddress": distribution.place_address,
+        "placeUrl": distribution.place_url or "",
+        "mainKeyword": distribution.main_keyword,
+        "bottomTagsString": distribution.bottom_tags or "",
+        "forbiddenWordsString": distribution.forbidden_words or "",
+        "taskCount": 1,
+        "prompt": distribution.prompt_template or "",
+        "category": distribution.distribution_category or "",
+        "imageOption": distribution.image_option,
         "imageUrls": image_urls,
-        "googleDriveUrl": place.google_drive_url or "",
-        "pixabayKeyword": place.pixabay_keyword or "",
+        "googleDriveUrl": distribution.google_drive_url or "",
+        "pixabayKeyword": distribution.pixabay_keyword or "",
         "naverAccount": {
             "id": account.naver_id,
             "pw": account.naver_pw,
@@ -291,18 +316,13 @@ async def get_blog_task(
     }
 
 @app.post("/api/blog-task/start")
-async def start_blog_task(
-    task_id: int = Form(...),
-    pc_hw_code: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Mark task as started"""
-    task = db.query(BlogTask).filter(BlogTask.id == task_id).first()
+async def start_blog_task(task_id: int = Form(...), pc_hw_code: str = Form(...), db: Session = Depends(get_db)):
+    task = db.query(TaskAssignment).filter(TaskAssignment.id == task_id).first()
     if task:
         task.status = "in_progress"
         task.pc_hw_code = pc_hw_code
-        task.assigned_at = datetime.utcnow()
-        db.add(TaskHistory(task_id=task_id, action="started", details=f"PC: {pc_hw_code}"))
+        task.started_at = datetime.utcnow()
+        db.add(TaskHistory(assignment_id=task_id, action="started", details=f"PC: {pc_hw_code}"))
         db.commit()
     return {"success": True}
 
@@ -317,28 +337,29 @@ async def complete_blog_task(
     post_title: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Report task completion"""
-    task = db.query(BlogTask).filter(BlogTask.id == task_id).first()
+    task = db.query(TaskAssignment).filter(TaskAssignment.id == task_id).first()
     if task:
         task.status = status
         task.result_post_url = result_url
         task.post_title = post_title
         task.completed_at = datetime.utcnow()
-        db.add(TaskHistory(
-            task_id=task_id,
-            action="completed" if status == "completed" else "failed",
-            details=f"URL: {result_url}"
-        ))
+
+        # 배포 통계 업데이트
+        dist = task.distribution
+        if dist:
+            if status == "completed":
+                dist.completed_tasks += 1
+            else:
+                dist.failed_tasks += 1
+            if dist.completed_tasks + dist.failed_tasks >= dist.total_tasks:
+                dist.status = "completed"
+
+        db.add(TaskHistory(assignment_id=task_id, action=status, details=f"URL: {result_url}"))
         db.commit()
     return {"success": True}
 
 @app.post("/api/account/status")
-async def update_account_status(
-    naver_id: str = Form(...),
-    status: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Update Naver account status"""
+async def update_account_status(naver_id: str = Form(...), status: str = Form(...), db: Session = Depends(get_db)):
     account = db.query(NaverAccount).filter(NaverAccount.naver_id == naver_id).first()
     if account:
         account.status = status
@@ -346,59 +367,45 @@ async def update_account_status(
     return {"success": True}
 
 @app.get("/api/deleted-tasks")
-async def get_deleted_tasks(
-    pc_hw_code: str = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Get tasks marked for deletion"""
-    tasks = db.query(BlogTask).filter(BlogTask.status == "deleted").all()
+async def get_deleted_tasks(pc_hw_code: str = Query(...), db: Session = Depends(get_db)):
+    tasks = db.query(TaskAssignment).filter(TaskAssignment.status == "deleted").all()
     result = []
     for task in tasks:
-        if task.naver_account:
+        if task.naver_account and task.distribution:
             result.append({
                 "taskId": task.id,
                 "id": task.naver_account.naver_id,
                 "pw": task.naver_account.naver_pw,
                 "blogUrl": task.result_post_url,
-                "placeName": task.place.name if task.place else "",
+                "placeName": task.distribution.place_name,
                 "proxyIp": task.naver_account.proxy_ip or ""
             })
     return result
 
 @app.post("/api/deletion-complete")
-async def report_deletion_complete(
-    task_ids: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Report deletion completed"""
+async def report_deletion_complete(task_ids: str = Form(...), db: Session = Depends(get_db)):
     try:
-        ids = json.loads(task_ids)
-        for task_id in ids:
-            task = db.query(BlogTask).filter(BlogTask.id == task_id).first()
+        for task_id in json.loads(task_ids):
+            task = db.query(TaskAssignment).filter(TaskAssignment.id == task_id).first()
             if task:
                 task.status = "deleted_confirmed"
-                db.commit()
+        db.commit()
     except:
         pass
     return {"success": True}
 
 @app.get("/api/chatgpt-key")
 async def get_chatgpt_key(db: Session = Depends(get_db)):
-    """Get ChatGPT API key"""
     setting = db.query(Setting).filter(Setting.key == "chatgpt_api_key").first()
     return {"apiKey": setting.value if setting else ""}
 
 @app.get("/api/prompt/{category}")
 async def get_prompt_by_category(category: str, db: Session = Depends(get_db)):
-    """Get prompt by category"""
     setting = db.query(Setting).filter(Setting.key == f"prompt_{category}").first()
     if not setting:
         setting = db.query(Setting).filter(Setting.key == "default_prompt").first()
     return {"prompt": setting.value if setting else ""}
 
-# ============================================
-# Run server
-# ============================================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

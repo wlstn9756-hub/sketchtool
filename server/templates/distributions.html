@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}블로그 배포 - 블로그 자동화{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title"><i class="bi bi-send"></i> 블로그 배포 관리</h2>
+    <a href="/distributions/new" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 새 배포 등록
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list-ul"></i> 배포 목록
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>업체명</th>
+                    <th>대표키워드</th>
+                    <th>카테고리</th>
+                    <th>진행상황</th>
+                    <th>기간</th>
+                    <th>상태</th>
+                    <th>등록일</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dist in distributions %}
+                <tr>
+                    <td>#{{ dist.id }}</td>
+                    <td>
+                        <strong>{{ dist.place_name }}</strong>
+                        <br><small class="text-muted">{{ dist.place_address[:30] }}...</small>
+                    </td>
+                    <td><span class="badge bg-primary">{{ dist.main_keyword }}</span></td>
+                    <td>{{ dist.distribution_category }}</td>
+                    <td>
+                        <div class="progress" style="height: 20px; min-width: 100px;">
+                            {% set progress = (dist.completed_tasks / dist.total_tasks * 100) if dist.total_tasks > 0 else 0 %}
+                            <div class="progress-bar bg-success" style="width: {{ progress }}%">
+                                {{ dist.completed_tasks }}/{{ dist.total_tasks }}
+                            </div>
+                        </div>
+                        {% if dist.failed_tasks > 0 %}
+                        <small class="text-danger">실패: {{ dist.failed_tasks }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small>
+                            {{ dist.start_date.strftime('%m/%d') }} ~ {{ dist.expected_end_date.strftime('%m/%d') }}<br>
+                            <span class="text-muted">일 {{ dist.daily_task_count }}건 x {{ dist.total_days }}일</span>
+                        </small>
+                    </td>
+                    <td>
+                        {% if dist.status == 'active' %}
+                        <span class="badge badge-active">진행중</span>
+                        {% elif dist.status == 'paused' %}
+                        <span class="badge badge-paused">일시정지</span>
+                        {% elif dist.status == 'completed' %}
+                        <span class="badge badge-completed">완료</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ dist.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ dist.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <form action="/distributions/delete/{{ dist.id }}" method="post" style="display: inline;" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="삭제">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p class="mt-2">등록된 배포가 없습니다</p>
+                        <a href="/distributions/new" class="btn btn-primary btn-sm">첫 배포 등록하기</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

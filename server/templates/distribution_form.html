@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}새 배포 등록 - 블로그 자동화{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .form-section-title {
+        font-weight: 600;
+        color: #1a237e;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #3f51b5;
+    }
+    .place-info-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        display: none;
+    }
+    .place-info-card.show {
+        display: block;
+    }
+    .schedule-preview {
+        background: #e3f2fd;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+    }
+    .image-option-item {
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .image-option-item:hover {
+        border-color: #3f51b5;
+    }
+    .image-option-item.selected {
+        border-color: #3f51b5;
+        background: #e8eaf6;
+    }
+    .image-option-item input[type="radio"] {
+        margin-right: 10px;
+    }
+    .sub-option {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+        display: none;
+    }
+    .image-option-item.selected .sub-option {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title"><i class="bi bi-plus-circle"></i> 새 배포 등록</h2>
+    <a href="/distributions" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 목록으로
+    </a>
+</div>
+
+<form id="distributionForm" action="/distributions/add" method="post">
+    <!-- 플레이스 정보 섹션 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-geo-alt"></i> 플레이스 정보
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-9">
+                    <label class="form-label">플레이스 URL *</label>
+                    <div class="input-group">
+                        <input type="text" id="placeUrlInput" class="form-control"
+                               placeholder="https://map.naver.com/p/... 또는 https://naver.me/..."
+                               required>
+                        <button type="button" id="lookupBtn" class="btn btn-primary">
+                            <i class="bi bi-search"></i> 조회
+                        </button>
+                    </div>
+                    <small class="text-muted">네이버 지도/플레이스 URL을 입력하세요</small>
+                </div>
+            </div>
+
+            <!-- 조회 결과 -->
+            <div id="placeInfoCard" class="place-info-card mt-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>업체명:</strong> <span id="placeName">-</span></p>
+                        <p><strong>주소:</strong> <span id="placeAddress">-</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>카테고리:</strong> <span id="placeCategory">-</span></p>
+                        <p><strong>전화번호:</strong> <span id="placePhone">-</span></p>
+                    </div>
+                </div>
+                <div class="alert alert-success mb-0 mt-2">
+                    <i class="bi bi-check-circle"></i> 플레이스 정보가 확인되었습니다
+                </div>
+            </div>
+
+            <!-- Hidden fields -->
+            <input type="hidden" name="place_url" id="placeUrl">
+            <input type="hidden" name="place_name" id="placeNameHidden">
+            <input type="hidden" name="place_address" id="placeAddressHidden">
+            <input type="hidden" name="place_category" id="placeCategoryHidden">
+        </div>
+    </div>
+
+    <!-- 배포 설정 섹션 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-gear"></i> 배포 설정
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">배포 카테고리 *</label>
+                    <select name="distribution_category" class="form-select" required>
+                        <option value="">-- 선택하세요 --</option>
+                        <option value="맛집">맛집</option>
+                        <option value="카페">카페</option>
+                        <option value="뷰티">뷰티/미용</option>
+                        <option value="병원">병원/의료</option>
+                        <option value="숙박">숙박/펜션</option>
+                        <option value="쇼핑">쇼핑</option>
+                        <option value="레저">레저/스포츠</option>
+                        <option value="교육">교육</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <!-- 이미지 옵션 -->
+            <h6 class="form-section-title"><i class="bi bi-image"></i> 이미지 옵션</h6>
+
+            <div class="image-option-item selected" data-option="none">
+                <label>
+                    <input type="radio" name="image_option" value="none" checked>
+                    <strong>이미지 없음</strong>
+                    <small class="text-muted ms-2">텍스트만 포스팅</small>
+                </label>
+            </div>
+
+            <div class="image-option-item" data-option="pixabay">
+                <label>
+                    <input type="radio" name="image_option" value="pixabay">
+                    <strong>Pixabay 이미지</strong>
+                    <small class="text-muted ms-2">키워드로 무료 이미지 검색</small>
+                </label>
+                <div class="sub-option">
+                    <input type="text" name="pixabay_keyword" class="form-control"
+                           placeholder="이미지 검색 키워드 (예: coffee, restaurant)">
+                </div>
+            </div>
+
+            <div class="image-option-item" data-option="google_drive">
+                <label>
+                    <input type="radio" name="image_option" value="google_drive">
+                    <strong>Google Drive</strong>
+                    <small class="text-muted ms-2">드라이브 폴더에서 이미지 가져오기</small>
+                </label>
+                <div class="sub-option">
+                    <input type="text" name="google_drive_url" class="form-control"
+                           placeholder="Google Drive 공유 폴더 URL">
+                </div>
+            </div>
+
+            <div class="image-option-item" data-option="custom">
+                <label>
+                    <input type="radio" name="image_option" value="custom">
+                    <strong>직접 입력</strong>
+                    <small class="text-muted ms-2">이미지 URL 직접 입력</small>
+                </label>
+                <div class="sub-option">
+                    <textarea name="image_urls" class="form-control" rows="3"
+                              placeholder="이미지 URL을 한 줄에 하나씩 입력"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스케줄 섹션 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-calendar3"></i> 스케줄 설정
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">시작일 *</label>
+                    <input type="date" name="start_date" id="startDate" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">일 작업 수 *</label>
+                    <input type="number" name="daily_task_count" id="dailyTaskCount"
+                           class="form-control" value="1" min="1" max="500" required>
+                    <small class="text-muted">1~500</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">작업 일 수 *</label>
+                    <input type="number" name="total_days" id="totalDays"
+                           class="form-control" value="1" min="1" max="365" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">예상 종료일</label>
+                    <input type="text" id="expectedEndDate" class="form-control" readonly>
+                </div>
+            </div>
+
+            <div class="schedule-preview mt-3">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h4 id="totalTasksPreview">1</h4>
+                        <small>총 작업 수</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4 id="periodPreview">1일</h4>
+                        <small>작업 기간</small>
+                    </div>
+                    <div class="col-md-4">
+                        <h4 id="dailyPreview">1건/일</h4>
+                        <small>일일 작업량</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 키워드 설정 섹션 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-tag"></i> 키워드 설정
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">제목 내 필수 텍스트 (대표키워드) *</label>
+                <input type="text" name="main_keyword" class="form-control"
+                       placeholder="예: 강남맛집" required>
+                <small class="text-muted">블로그 제목에 반드시 포함될 키워드 (1개)</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">본문 내 포함 금지어</label>
+                <input type="text" name="forbidden_words" class="form-control"
+                       placeholder="예: 광고, 협찬, 무료 (콤마로 구분)">
+                <small class="text-muted">블로그 본문에서 제외할 단어들 (콤마로 구분)</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">하단 태그</label>
+                <input type="text" name="bottom_tags" class="form-control"
+                       placeholder="예: #맛집 #강남 #데이트 (공백으로 구분)">
+                <small class="text-muted">포스팅 하단에 추가될 해시태그</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- GPT 프롬프트 섹션 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-robot"></i> GPT 프롬프트 (선택)
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">커스텀 프롬프트</label>
+                <textarea name="prompt_template" class="form-control" rows="4"
+                          placeholder="GPT에게 전달할 커스텀 프롬프트를 입력하세요. 비워두면 기본 프롬프트가 사용됩니다."></textarea>
+                <small class="text-muted">
+                    사용 가능한 변수: {place_name}, {address}, {keyword}, {category}
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 제출 버튼 -->
+    <div class="d-flex justify-content-between">
+        <a href="/distributions" class="btn btn-outline-secondary">
+            <i class="bi bi-x"></i> 취소
+        </a>
+        <button type="submit" id="submitBtn" class="btn btn-primary btn-lg" disabled>
+            <i class="bi bi-check-circle"></i> 배포 등록
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lookupBtn = document.getElementById('lookupBtn');
+    const placeUrlInput = document.getElementById('placeUrlInput');
+    const placeInfoCard = document.getElementById('placeInfoCard');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // 오늘 날짜 기본값
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today;
+    updateSchedulePreview();
+
+    // 플레이스 조회
+    lookupBtn.addEventListener('click', async function() {
+        const url = placeUrlInput.value.trim();
+        if (!url) {
+            alert('플레이스 URL을 입력하세요');
+            return;
+        }
+
+        lookupBtn.disabled = true;
+        lookupBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 조회중...';
+
+        try {
+            const formData = new FormData();
+            formData.append('url', url);
+
+            const response = await fetch('/api/place/lookup', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('placeName').textContent = data.name || '-';
+                document.getElementById('placeAddress').textContent = data.address || '-';
+                document.getElementById('placeCategory').textContent = data.category || '-';
+                document.getElementById('placePhone').textContent = data.phone || '-';
+
+                // Hidden fields
+                document.getElementById('placeUrl').value = url;
+                document.getElementById('placeNameHidden').value = data.name || '';
+                document.getElementById('placeAddressHidden').value = data.address || '';
+                document.getElementById('placeCategoryHidden').value = data.category || '';
+
+                placeInfoCard.classList.add('show');
+                submitBtn.disabled = false;
+            } else {
+                alert('조회 실패: ' + (data.error || '알 수 없는 오류'));
+                placeInfoCard.classList.remove('show');
+                submitBtn.disabled = true;
+            }
+        } catch (error) {
+            alert('조회 중 오류가 발생했습니다');
+            console.error(error);
+        } finally {
+            lookupBtn.disabled = false;
+            lookupBtn.innerHTML = '<i class="bi bi-search"></i> 조회';
+        }
+    });
+
+    // 이미지 옵션 선택
+    document.querySelectorAll('.image-option-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.image-option-item').forEach(i => i.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+
+    // 스케줄 미리보기 업데이트
+    function updateSchedulePreview() {
+        const startDate = document.getElementById('startDate').value;
+        const dailyCount = parseInt(document.getElementById('dailyTaskCount').value) || 1;
+        const totalDays = parseInt(document.getElementById('totalDays').value) || 1;
+
+        const totalTasks = dailyCount * totalDays;
+        document.getElementById('totalTasksPreview').textContent = totalTasks + '건';
+        document.getElementById('periodPreview').textContent = totalDays + '일';
+        document.getElementById('dailyPreview').textContent = dailyCount + '건/일';
+
+        if (startDate) {
+            const start = new Date(startDate);
+            const end = new Date(start);
+            end.setDate(end.getDate() + totalDays - 1);
+            document.getElementById('expectedEndDate').value = end.toISOString().split('T')[0];
+        }
+    }
+
+    document.getElementById('startDate').addEventListener('change', updateSchedulePreview);
+    document.getElementById('dailyTaskCount').addEventListener('input', updateSchedulePreview);
+    document.getElementById('totalDays').addEventListener('input', updateSchedulePreview);
+
+    // Form validation
+    document.getElementById('distributionForm').addEventListener('submit', function(e) {
+        if (!document.getElementById('placeNameHidden').value) {
+            e.preventDefault();
+            alert('플레이스 URL을 조회해주세요');
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}
