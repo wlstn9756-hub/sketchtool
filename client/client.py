@@ -12,6 +12,7 @@ from config import CONFIG, save_config
 from naver_login import NaverLogin
 from gpt_generator import GPTGenerator
 from blog_poster import BlogPoster
+from thumbnail_generator import ThumbnailGenerator
 
 
 class BlogAutoClient:
@@ -182,6 +183,27 @@ class BlogAutoClient:
 
             print(f"[콘텐츠] 제목: {content['title']}")
 
+            # 1.5 이미지 처리
+            images = []
+            image_option = distribution.get("image_option", "none")
+            print(f"[이미지] 옵션: {image_option}")
+
+            if image_option == "text_image":
+                # 텍스트 이미지 생성
+                print("[이미지] 텍스트 이미지 생성 중...")
+                thumb_gen = ThumbnailGenerator()
+                thumb_path = thumb_gen.generate_thumbnail(content["title"])
+                if thumb_path:
+                    images.append(thumb_path)
+                    print(f"[이미지] 썸네일 생성 완료: {thumb_path}")
+
+            elif image_option == "custom" and distribution.get("image_urls"):
+                # 직접 입력된 이미지 URL
+                urls = distribution.get("image_urls", "")
+                if urls:
+                    images = [u.strip() for u in urls.split("\n") if u.strip()]
+                    print(f"[이미지] 커스텀 이미지 {len(images)}개")
+
             # 2. 네이버 로그인
             print("\n[단계 2/4] 네이버 로그인 중...")
 
@@ -201,7 +223,8 @@ class BlogAutoClient:
             result_url = poster.write_post(
                 title=content["title"],
                 body=content["body"],
-                tags=content.get("tags")
+                tags=content.get("tags"),
+                images=images if images else None
             )
 
             if not result_url:

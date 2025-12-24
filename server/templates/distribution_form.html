@@ -154,15 +154,8 @@
                     <label class="form-label">배포 카테고리 *</label>
                     <select name="distribution_category" class="form-select" required>
                         <option value="">-- 선택하세요 --</option>
-                        <option value="맛집">맛집</option>
-                        <option value="카페">카페</option>
-                        <option value="뷰티">뷰티/미용</option>
-                        <option value="병원">병원/의료</option>
-                        <option value="숙박">숙박/펜션</option>
-                        <option value="쇼핑">쇼핑</option>
-                        <option value="레저">레저/스포츠</option>
-                        <option value="교육">교육</option>
-                        <option value="기타">기타</option>
+                        <option value="병원">병원</option>
+                        <option value="정보성">정보성</option>
                     </select>
                 </div>
             </div>
@@ -178,6 +171,17 @@
                     <strong>이미지 없음</strong>
                     <small class="text-muted ms-2">텍스트만 포스팅</small>
                 </label>
+            </div>
+
+            <div class="image-option-item" data-option="text_image">
+                <label>
+                    <input type="radio" name="image_option" value="text_image">
+                    <strong>텍스트 이미지</strong>
+                    <small class="text-muted ms-2">제목 텍스트가 포함된 썸네일 자동 생성</small>
+                </label>
+                <div class="sub-option">
+                    <small class="text-muted">배경 이미지에 제목 텍스트를 오버레이하여 썸네일을 생성합니다.</small>
+                </div>
             </div>
 
             <div class="image-option-item" data-option="pixabay">

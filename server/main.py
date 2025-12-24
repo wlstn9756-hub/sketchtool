@@ -277,14 +277,17 @@ async def get_blog_task(pc_hw_code: str = Query(...), db: Session = Depends(get_
     if not distribution:
         return {"success": False, "message": "배포 정보를 찾을 수 없습니다"}
 
-    # 사용 가능한 계정 찾기
+    # 사용 가능한 계정 찾기 (LRU: 가장 오래전에 사용된 계정부터)
     if not task.naver_account_id:
         account = db.query(NaverAccount).filter(
             NaverAccount.is_active == True,
             NaverAccount.status == "active"
+        ).order_by(
+            NaverAccount.last_used.asc().nullsfirst()  # NULL(미사용)이 먼저, 그 다음 오래된 순
         ).first()
         if account:
             task.naver_account_id = account.id
+            account.last_used = datetime.utcnow()  # 사용 시간 업데이트
             db.commit()
 
     account = task.naver_account
@@ -474,14 +477,17 @@ async def get_task_api(hw_code: str = Query(...), db: Session = Depends(get_db))
     if not distribution:
         return {"task": None}
 
-    # 사용 가능한 계정 찾기
+    # 사용 가능한 계정 찾기 (LRU: 가장 오래전에 사용된 계정부터)
     if not task.naver_account_id:
         account = db.query(NaverAccount).filter(
             NaverAccount.is_active == True,
             NaverAccount.status == "active"
+        ).order_by(
+            NaverAccount.last_used.asc().nullsfirst()  # NULL(미사용)이 먼저, 그 다음 오래된 순
         ).first()
         if account:
             task.naver_account_id = account.id
+            account.last_used = datetime.utcnow()  # 사용 시간 업데이트
             db.commit()
 
     account = task.naver_account
