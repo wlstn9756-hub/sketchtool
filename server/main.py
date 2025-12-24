@@ -11,6 +11,9 @@ import hashlib
 import json
 import os
 
+# 현재 파일 기준 경로 설정
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from database import (
     init_db, get_db,
     User, RegisteredPC, NaverAccount, BlogDistribution, TaskAssignment, Setting, TaskHistory
@@ -43,8 +46,14 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="블로그 자동화 관리", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+
+# 정적 파일과 템플릿 경로 설정
+static_dir = os.path.join(BASE_DIR, "static")
+templates_dir = os.path.join(BASE_DIR, "templates")
+
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+templates = Jinja2Templates(directory=templates_dir)
 
 # ============================================
 # 대시보드
