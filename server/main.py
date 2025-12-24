@@ -139,9 +139,9 @@ async def lookup_place(url: str = Form(...)):
 
 @app.post("/distributions/add")
 async def add_distribution(
-    place_url: str = Form(...),
+    place_url: str = Form(""),
     place_name: str = Form(...),
-    place_address: str = Form(...),
+    place_address: str = Form(""),
     place_category: str = Form(None),
     distribution_category: str = Form(...),
     image_option: str = Form("none"),
