@@ -109,6 +109,32 @@
                 </div>
             </div>
 
+            <!-- 수동 입력 옵션 -->
+            <div class="mt-3">
+                <button type="button" id="manualEntryBtn" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil"></i> 직접 입력하기
+                </button>
+            </div>
+
+            <div id="manualEntryForm" class="mt-3" style="display: none;">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 조회가 되지 않는 경우 직접 입력하세요
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">업체명 *</label>
+                        <input type="text" id="manualPlaceName" class="form-control" placeholder="업체명 입력">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">주소</label>
+                        <input type="text" id="manualPlaceAddress" class="form-control" placeholder="주소 입력">
+                    </div>
+                </div>
+                <button type="button" id="confirmManualBtn" class="btn btn-success">
+                    <i class="bi bi-check"></i> 확인
+                </button>
+            </div>
+
             <!-- Hidden fields -->
             <input type="hidden" name="place_url" id="placeUrl">
             <input type="hidden" name="place_name" id="placeNameHidden">
@@ -391,11 +417,49 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('dailyTaskCount').addEventListener('input', updateSchedulePreview);
     document.getElementById('totalDays').addEventListener('input', updateSchedulePreview);
 
+    // 수동 입력 토글
+    const manualEntryBtn = document.getElementById('manualEntryBtn');
+    const manualEntryForm = document.getElementById('manualEntryForm');
+    const confirmManualBtn = document.getElementById('confirmManualBtn');
+
+    manualEntryBtn.addEventListener('click', function() {
+        manualEntryForm.style.display = manualEntryForm.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // 수동 입력 확인
+    confirmManualBtn.addEventListener('click', function() {
+        const name = document.getElementById('manualPlaceName').value.trim();
+        const address = document.getElementById('manualPlaceAddress').value.trim();
+
+        if (!name) {
+            alert('업체명을 입력해주세요');
+            return;
+        }
+
+        // Hidden fields에 저장
+        document.getElementById('placeUrl').value = placeUrlInput.value.trim() || '';
+        document.getElementById('placeNameHidden').value = name;
+        document.getElementById('placeAddressHidden').value = address;
+        document.getElementById('placeCategoryHidden').value = '';
+
+        // 결과 표시
+        document.getElementById('placeName').textContent = name;
+        document.getElementById('placeAddress').textContent = address || '-';
+        document.getElementById('placeCategory').textContent = '-';
+        document.getElementById('placePhone').textContent = '-';
+
+        placeInfoCard.classList.add('show');
+        manualEntryForm.style.display = 'none';
+        submitBtn.disabled = false;
+
+        alert('업체 정보가 입력되었습니다');
+    });
+
     // Form validation
     document.getElementById('distributionForm').addEventListener('submit', function(e) {
         if (!document.getElementById('placeNameHidden').value) {
             e.preventDefault();
-            alert('플레이스 URL을 조회해주세요');
+            alert('플레이스 정보를 입력해주세요 (조회 또는 직접 입력)');
             return;
         }
     });

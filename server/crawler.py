@@ -6,27 +6,21 @@ import httpx
 import re
 import json
 from typing import Optional, Dict, Any
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, unquote
 
 class PlaceCrawler:
     """네이버 플레이스 정보 크롤러"""
 
     HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept": "application/json, text/plain, */*",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://map.naver.com/",
     }
 
     @staticmethod
     def extract_place_id(url: str) -> Optional[str]:
         """URL에서 플레이스 ID 추출"""
-        # 다양한 URL 형식 처리
-        # https://map.naver.com/p/search/맛집/place/12345678
-        # https://map.naver.com/v5/search/맛집/place/12345678
-        # https://naver.me/xxxxx (단축 URL)
-        # https://m.place.naver.com/restaurant/12345678
-        # https://place.naver.com/restaurant/12345678
-
         patterns = [
             r'/place/(\d+)',
             r'/restaurant/(\d+)',
@@ -34,6 +28,7 @@ class PlaceCrawler:
             r'/hospital/(\d+)',
             r'/beauty/(\d+)',
             r'/accommodation/(\d+)',
+            r'/entry/place/(\d+)',
         ]
 
         for pattern in patterns:
@@ -42,6 +37,16 @@ class PlaceCrawler:
                 return match.group(1)
 
         return None
+
+    @staticmethod
+    async def resolve_short_url(url: str) -> str:
+        """단축 URL을 원본 URL로 변환"""
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
+                response = await client.head(url, headers=PlaceCrawler.HEADERS)
+                return str(response.url)
+        except:
+            return url
 
     @staticmethod
     async def fetch_place_info(url: str) -> Dict[str, Any]:
@@ -58,89 +63,129 @@ class PlaceCrawler:
         }
 
         try:
+            # 단축 URL 처리
+            if "naver.me" in url:
+                url = await PlaceCrawler.resolve_short_url(url)
+                result["url"] = url
+
             place_id = PlaceCrawler.extract_place_id(url)
 
             if not place_id:
-                # 단축 URL인 경우 리다이렉트 따라가기
-                async with httpx.AsyncClient(follow_redirects=True) as client:
-                    response = await client.get(url, headers=PlaceCrawler.HEADERS, timeout=10)
-                    final_url = str(response.url)
-                    place_id = PlaceCrawler.extract_place_id(final_url)
-
-            if not place_id:
-                result["error"] = "플레이스 ID를 찾을 수 없습니다"
+                result["error"] = "플레이스 ID를 찾을 수 없습니다. URL을 확인해주세요."
                 return result
 
             result["place_id"] = place_id
 
-            # 네이버 플레이스 API 호출 (비공식)
-            api_url = f"https://map.naver.com/p/api/search/allSearch?query={place_id}&type=all"
+            # 네이버 플레이스 GraphQL API 사용
+            api_url = "https://pcmap-api.place.naver.com/graphql"
 
-            # 또는 직접 페이지 크롤링
-            place_url = f"https://m.place.naver.com/place/{place_id}"
+            graphql_query = {
+                "operationName": "getPlaceDetailBasic",
+                "variables": {"id": place_id},
+                "query": """
+                    query getPlaceDetailBasic($id: String!) {
+                        placeDetail(id: $id) {
+                            id
+                            name
+                            category
+                            road
+                            address
+                            phone
+                            businessHours
+                        }
+                    }
+                """
+            }
 
-            async with httpx.AsyncClient() as client:
-                response = await client.get(place_url, headers=PlaceCrawler.HEADERS, timeout=10)
+            headers = {
+                **PlaceCrawler.HEADERS,
+                "Content-Type": "application/json",
+                "Origin": "https://map.naver.com",
+            }
+
+            async with httpx.AsyncClient(timeout=15) as client:
+                # GraphQL API 시도
+                try:
+                    response = await client.post(api_url, json=graphql_query, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "data" in data and data["data"].get("placeDetail"):
+                            place = data["data"]["placeDetail"]
+                            result["name"] = place.get("name", "")
+                            result["address"] = place.get("road") or place.get("address", "")
+                            result["category"] = place.get("category", "")
+                            result["phone"] = place.get("phone", "")
+                            if result["name"]:
+                                result["success"] = True
+                                return result
+                except Exception:
+                    pass
+
+                # 대체 방법: 모바일 페이지 크롤링
+                mobile_url = f"https://m.place.naver.com/place/{place_id}/home"
+                response = await client.get(mobile_url, headers=PlaceCrawler.HEADERS)
                 html = response.text
 
-                # JSON-LD 데이터 추출 시도
-                json_ld_match = re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
-                if json_ld_match:
-                    try:
-                        json_data = json.loads(json_ld_match.group(1))
-                        if isinstance(json_data, dict):
-                            result["name"] = json_data.get("name", "")
-                            if "address" in json_data:
-                                addr = json_data["address"]
-                                if isinstance(addr, dict):
-                                    result["address"] = addr.get("streetAddress", "")
-                                else:
-                                    result["address"] = str(addr)
-                            result["phone"] = json_data.get("telephone", "")
-                    except json.JSONDecodeError:
-                        pass
+                # __NEXT_DATA__ JSON 추출
+                next_data_match = re.search(
+                    r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+                    html, re.DOTALL
+                )
 
-                # __NEXT_DATA__ 에서 추출 시도
-                next_data_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
                 if next_data_match:
                     try:
                         next_data = json.loads(next_data_match.group(1))
-                        # props에서 업체 정보 추출
-                        props = next_data.get("props", {}).get("pageProps", {})
-                        if "initialState" in props:
-                            state = props["initialState"]
-                            if "place" in state:
-                                place_data = state["place"].get("place", {})
-                                result["name"] = place_data.get("name", result["name"])
-                                result["address"] = place_data.get("roadAddress", result["address"]) or place_data.get("address", "")
-                                result["category"] = place_data.get("category", "")
-                                result["phone"] = place_data.get("phone", result["phone"])
+                        page_props = next_data.get("props", {}).get("pageProps", {})
+
+                        # initialState에서 찾기
+                        initial_state = page_props.get("initialState", {})
+                        place_data = initial_state.get("place", {}).get("detailPlaceHome", {})
+
+                        if not place_data:
+                            place_data = initial_state.get("place", {}).get("home", {})
+
+                        if place_data:
+                            result["name"] = place_data.get("name", "")
+                            result["address"] = place_data.get("roadAddress") or place_data.get("address", "")
+                            result["category"] = place_data.get("category", "")
+                            result["phone"] = place_data.get("phone") or place_data.get("tel", "")
                     except json.JSONDecodeError:
                         pass
 
-                # 메타 태그에서 추출 시도
+                # 메타 태그에서 추출
                 if not result["name"]:
                     og_title = re.search(r'<meta property="og:title" content="([^"]+)"', html)
                     if og_title:
-                        result["name"] = og_title.group(1).split(" : ")[0].strip()
+                        title = og_title.group(1)
+                        # "업체명 : 네이버 지도" 형식에서 업체명만 추출
+                        result["name"] = title.split(" : ")[0].split(" - ")[0].strip()
 
                 if not result["address"]:
-                    # 주소 패턴 찾기
-                    addr_match = re.search(r'주소["\s:]+([^"<]+)', html)
-                    if addr_match:
-                        result["address"] = addr_match.group(1).strip()
+                    og_desc = re.search(r'<meta property="og:description" content="([^"]+)"', html)
+                    if og_desc:
+                        desc = og_desc.group(1)
+                        # 주소가 포함되어 있을 수 있음
+                        if any(x in desc for x in ["시 ", "군 ", "구 ", "동 ", "로 ", "길 "]):
+                            result["address"] = desc.split(",")[0].strip()
+
+                # 타이틀 태그에서 추출
+                if not result["name"]:
+                    title_match = re.search(r'<title>([^<]+)</title>', html)
+                    if title_match:
+                        title = title_match.group(1)
+                        result["name"] = title.split(" : ")[0].split(" - ")[0].strip()
 
             if result["name"]:
                 result["success"] = True
             else:
-                result["error"] = "업체 정보를 추출할 수 없습니다"
+                result["error"] = "업체 정보를 찾을 수 없습니다. URL을 확인해주세요."
 
         except httpx.TimeoutException:
-            result["error"] = "요청 시간이 초과되었습니다"
+            result["error"] = "요청 시간이 초과되었습니다. 다시 시도해주세요."
         except httpx.RequestError as e:
-            result["error"] = f"요청 오류: {str(e)}"
+            result["error"] = f"네트워크 오류: {str(e)}"
         except Exception as e:
-            result["error"] = f"크롤링 오류: {str(e)}"
+            result["error"] = f"오류 발생: {str(e)}"
 
         return result
 
@@ -152,7 +197,6 @@ class PlaceCrawler:
         try:
             parsed = urlparse(url)
 
-            # 지원하는 도메인 확인
             valid_domains = [
                 "map.naver.com",
                 "m.place.naver.com",
@@ -180,25 +224,14 @@ class PlaceCrawler:
         return result
 
 
-# 동기 버전 (테스트용)
-def fetch_place_info_sync(url: str) -> Dict[str, Any]:
-    """동기 버전 크롤러"""
-    import asyncio
-    return asyncio.run(PlaceCrawler.fetch_place_info(url))
-
-
 if __name__ == "__main__":
-    # 테스트
     import asyncio
-
-    test_urls = [
-        "https://map.naver.com/p/search/맛집/place/12345678",
-    ]
 
     async def test():
-        for url in test_urls:
-            print(f"\nTesting: {url}")
-            result = await PlaceCrawler.fetch_place_info(url)
-            print(f"Result: {result}")
+        # 테스트 URL (실제 URL로 교체하세요)
+        test_url = "https://map.naver.com/p/entry/place/1234567890"
+        print(f"Testing: {test_url}")
+        result = await PlaceCrawler.fetch_place_info(test_url)
+        print(f"Result: {json.dumps(result, ensure_ascii=False, indent=2)}")
 
     asyncio.run(test())
