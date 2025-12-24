@@ -415,6 +415,146 @@ async def get_prompt_by_category(category: str, db: Session = Depends(get_db)):
         setting = db.query(Setting).filter(Setting.key == "default_prompt").first()
     return {"prompt": setting.value if setting else ""}
 
+# ============================================
+# Python 클라이언트 API
+# ============================================
+@app.get("/api/health")
+async def health_check():
+    """서버 상태 확인"""
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+@app.post("/api/pc/register")
+async def register_pc_api(request: Request, db: Session = Depends(get_db)):
+    """PC 등록 API"""
+    try:
+        data = await request.json()
+        hw_code = data.get("hw_code")
+        pc_name = data.get("pc_name", f"PC-{hw_code[:8]}")
+
+        pc = db.query(RegisteredPC).filter(RegisteredPC.pc_hw_code == hw_code).first()
+        if not pc:
+            pc = RegisteredPC(pc_hw_code=hw_code, pc_name=pc_name)
+            db.add(pc)
+
+        pc.pc_name = pc_name
+        pc.last_seen = datetime.utcnow()
+        pc.is_active = True
+        db.commit()
+
+        return {"success": True, "pc_id": pc.id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/settings")
+async def get_settings_api(db: Session = Depends(get_db)):
+    """설정 가져오기 API (JSON)"""
+    settings = {s.key: s.value for s in db.query(Setting).all()}
+    return settings
+
+@app.get("/api/task/get")
+async def get_task_api(hw_code: str = Query(...), db: Session = Depends(get_db)):
+    """작업 가져오기 API"""
+    # PC 업데이트
+    pc = db.query(RegisteredPC).filter(RegisteredPC.pc_hw_code == hw_code).first()
+    if pc:
+        pc.last_seen = datetime.utcnow()
+        db.commit()
+
+    # 오늘 날짜의 대기중인 작업 찾기
+    today = date.today()
+    task = db.query(TaskAssignment).filter(
+        TaskAssignment.status == "pending",
+        TaskAssignment.scheduled_date <= today
+    ).order_by(TaskAssignment.scheduled_date.asc()).first()
+
+    if not task:
+        return {"task": None}
+
+    distribution = task.distribution
+    if not distribution:
+        return {"task": None}
+
+    # 사용 가능한 계정 찾기
+    if not task.naver_account_id:
+        account = db.query(NaverAccount).filter(
+            NaverAccount.is_active == True,
+            NaverAccount.status == "active"
+        ).first()
+        if account:
+            task.naver_account_id = account.id
+            db.commit()
+
+    account = task.naver_account
+    if not account:
+        return {"task": None, "error": "사용 가능한 계정이 없습니다"}
+
+    return {
+        "task": {
+            "id": task.id,
+            "distribution": {
+                "place_name": distribution.place_name,
+                "place_address": distribution.place_address,
+                "place_url": distribution.place_url,
+                "distribution_category": distribution.distribution_category,
+                "main_keyword": distribution.main_keyword,
+                "forbidden_words": distribution.forbidden_words,
+                "bottom_tags": distribution.bottom_tags,
+                "prompt_template": distribution.prompt_template,
+                "image_option": distribution.image_option,
+                "image_urls": distribution.image_urls,
+            },
+            "account": {
+                "naver_id": account.naver_id,
+                "naver_pw": account.naver_pw,
+                "proxy_ip": account.proxy_ip
+            }
+        }
+    }
+
+@app.post("/api/task/update")
+async def update_task_api(request: Request, db: Session = Depends(get_db)):
+    """작업 상태 업데이트 API"""
+    try:
+        data = await request.json()
+        task_id = data.get("task_id")
+        status = data.get("status")
+        result_url = data.get("result_url")
+        error_message = data.get("error_message")
+        hw_code = data.get("hw_code")
+
+        task = db.query(TaskAssignment).filter(TaskAssignment.id == task_id).first()
+        if not task:
+            return {"success": False, "error": "작업을 찾을 수 없습니다"}
+
+        task.status = status
+        task.pc_hw_code = hw_code
+
+        if status == "in_progress":
+            task.started_at = datetime.utcnow()
+        elif status in ["completed", "fail"]:
+            task.completed_at = datetime.utcnow()
+            if result_url:
+                task.result_post_url = result_url
+            if error_message:
+                task.error_message = error_message
+
+            # 배포 통계 업데이트
+            dist = task.distribution
+            if dist:
+                if status == "completed":
+                    dist.completed_tasks += 1
+                else:
+                    dist.failed_tasks += 1
+                if dist.completed_tasks + dist.failed_tasks >= dist.total_tasks:
+                    dist.status = "completed"
+
+        db.add(TaskHistory(assignment_id=task_id, action=status, details=f"URL: {result_url}" if result_url else error_message))
+        db.commit()
+
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
